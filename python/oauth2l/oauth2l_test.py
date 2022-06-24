@@ -71,7 +71,7 @@ class Oauth2lFormattingTest(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def _Args(self, credentials_format):
-        return ['--credentials_format=' + credentials_format, 'userinfo.email']
+        return [f'--credentials_format={credentials_format}', 'userinfo.email']
 
     def testFormatBare(self):
         output = _GetCommandOutput('fetch', self._Args('bare'))
@@ -80,13 +80,13 @@ class Oauth2lFormattingTest(unittest.TestCase):
 
     def testFormatHeader(self):
         output = _GetCommandOutput('fetch', self._Args('header'))
-        header = 'Authorization: Bearer %s' % self.access_token
+        header = f'Authorization: Bearer {self.access_token}'
         self.assertEqual(header, output)
         self.assertEqual(1, self.mock_fetch.call_count)
 
     def testHeaderCommand(self):
         output = _GetCommandOutput('header', ['userinfo.email'])
-        header = 'Authorization: Bearer %s' % self.access_token
+        header = f'Authorization: Bearer {self.access_token}'
         self.assertEqual(header, output)
         self.assertEqual(1, self.mock_fetch.call_count)
 
@@ -148,7 +148,7 @@ class TestFetch(unittest.TestCase):
 
         client_secrets_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_client_secrets.json')
-        self.json_args = ['--json=' + client_secrets_path]
+        self.json_args = [f'--json={client_secrets_path}']
 
     def testNoScopes(self):
         output = _GetCommandOutput('fetch', [])
@@ -221,7 +221,7 @@ class TestFetch(unittest.TestCase):
     def testCustomClientInfo(self):
         client_secrets_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_client_secrets.json')
-        fetch_args = ['--json=' + client_secrets_path, 'userinfo.email']
+        fetch_args = [f'--json={client_secrets_path}', 'userinfo.email']
         output = _GetCommandOutput('fetch', fetch_args)
         self.assertIn(self.access_token, output)
         self.assertEqual(1, self.mock_3lo.call_count)
@@ -391,7 +391,7 @@ class TestServiceAccounts(unittest.TestCase):
         mock_get.return_value = self.credentials
         service_account_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_service_account.json')
-        fetch_args = ['--json=' + service_account_path, 'userinfo.email']
+        fetch_args = [f'--json={service_account_path}', 'userinfo.email']
         output = _GetCommandOutput('fetch', fetch_args)
         self.assertIn(self.access_token, output)
         self.assertEqual(1, mock_get.call_count)
@@ -403,7 +403,7 @@ class TestServiceAccounts(unittest.TestCase):
         mock_store.get.return_value = None
         service_account_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_service_account.json')
-        fetch_args = ['--json=' + service_account_path, 'userinfo.email']
+        fetch_args = [f'--json={service_account_path}', 'userinfo.email']
         output = _GetCommandOutput('fetch', fetch_args)
         self.assertIn(self.access_token, output)
         self.assertEqual(1, self.from_keyfile.call_count)
@@ -415,7 +415,7 @@ class TestServiceAccounts(unittest.TestCase):
         mock_store.get.return_value = self.credentials
         service_account_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_service_account.json')
-        fetch_args = ['--json=' + service_account_path, 'userinfo.email']
+        fetch_args = [f'--json={service_account_path}', 'userinfo.email']
         output = _GetCommandOutput('fetch', fetch_args)
         self.assertIn(self.access_token, output)
         self.assertEqual(0, self.from_keyfile.call_count)
@@ -430,7 +430,7 @@ class TestServiceAccounts(unittest.TestCase):
         mock_store.get.return_value = invalid_credentials
         service_account_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_service_account.json')
-        fetch_args = ['--json=' + service_account_path, 'userinfo.email']
+        fetch_args = [f'--json={service_account_path}', 'userinfo.email']
         output = _GetCommandOutput('fetch', fetch_args)
         self.assertIn(self.access_token, output)
         self.assertEqual(1, self.from_keyfile.call_count)
@@ -493,11 +493,21 @@ class TestJwt(unittest.TestCase):
         service_account_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_service_account.json')
 
-        fetch_args = ['--jwt', '--json=' + service_account_path, 'https://fake/audience']
+        fetch_args = [
+            '--jwt',
+            f'--json={service_account_path}',
+            'https://fake/audience',
+        ]
+
         output = _GetCommandOutput('fetch', fetch_args)
         header_base64, payload_base64, signature_base64 = output.split('.')
         header = json.loads(base64.urlsafe_b64decode(header_base64.encode('utf-8')).decode())
-        payload = json.loads(base64.urlsafe_b64decode((payload_base64 + "==").encode('utf-8')).decode())
+        payload = json.loads(
+            base64.urlsafe_b64decode(
+                f"{payload_base64}==".encode('utf-8')
+            ).decode()
+        )
+
         self.assertEqual(self.expected_jwt_header, header)
         self.assertEqual(self.expected_jwt_payload, payload)
         self.assertEqual(1, mock_time.call_count)
@@ -567,7 +577,7 @@ class Test3LO(unittest.TestCase):
 
         client_secrets_path = os.path.join(
             os.path.dirname(__file__), 'testdata/fake_client_secrets.json')
-        self.json_args = ['--json=' + client_secrets_path]
+        self.json_args = [f'--json={client_secrets_path}']
 
     @mock.patch('oauth2client.contrib.multiprocess_file_storage.'
                 'MultiprocessFileStorage', autospec=True)
