@@ -53,6 +53,7 @@ into other programs:
 
 """
 
+
 from __future__ import print_function
 
 import argparse
@@ -88,7 +89,7 @@ _OAUTH2_TOKENINFO_TEMPLATE = (
 # Keep in sync with setup.py. (Currently just used for UserAgent
 # tagging, so not critical.)
 _OAUTH2L_VERSION = pkg_resources.get_distribution('google-oauth2l').version
-_DEFAULT_USER_AGENT = 'oauth2l/' + _OAUTH2L_VERSION
+_DEFAULT_USER_AGENT = f'oauth2l/{_OAUTH2L_VERSION}'
 # Prefix of Google OAuth scopes
 _SCOPE_PREFIX = 'https://www.googleapis.com/auth/'
 
@@ -98,8 +99,8 @@ _PREFIXLESS_SCOPES = ['profile', 'email', 'openid']
 # We need to know the gcloud scopes in order to decide when to use the
 # Application Default Credentials.
 _GCLOUD_SCOPES = {
-    _SCOPE_PREFIX + 'cloud-platform',
-    _SCOPE_PREFIX + 'userinfo.email',
+    f'{_SCOPE_PREFIX}cloud-platform',
+    f'{_SCOPE_PREFIX}userinfo.email',
 }
 
 # CLI to retrieve OAuth 2 token via Google Corp SSO.
@@ -150,45 +151,43 @@ def _AsText(text_or_bytes):
 
 
 def _Format(fmt, credentials):
-    """Format credentials according to fmt."""
-    if fmt == 'bare':
-        return credentials.access_token
-    elif fmt == 'header':
-        return 'Authorization: Bearer {}'.format(credentials.access_token)
-    elif fmt == 'json':
-        return _PrettyJson(json.loads(_AsText(credentials.to_json())))
-    elif fmt == 'json_compact':
-        return _CompactJson(json.loads(_AsText(credentials.to_json())))
-    elif fmt == 'pretty':
-        format_str = textwrap.dedent('\n'.join([
-            'Fetched credentials of type:',
-            '  {credentials_type.__module__}.{credentials_type.__name__}',
-            'Access token:',
-            '  {credentials.access_token}',
-        ]))
-        return format_str.format(credentials=credentials,
-                                 credentials_type=type(credentials))
-    raise ValueError('Unknown format: {0}'.format(fmt))
+  """Format credentials according to fmt."""
+  if fmt == 'bare':
+    return credentials.access_token
+  elif fmt == 'header':
+    return f'Authorization: Bearer {credentials.access_token}'
+  elif fmt == 'json':
+      return _PrettyJson(json.loads(_AsText(credentials.to_json())))
+  elif fmt == 'json_compact':
+      return _CompactJson(json.loads(_AsText(credentials.to_json())))
+  elif fmt == 'pretty':
+      format_str = textwrap.dedent('\n'.join([
+          'Fetched credentials of type:',
+          '  {credentials_type.__module__}.{credentials_type.__name__}',
+          'Access token:',
+          '  {credentials.access_token}',
+      ]))
+      return format_str.format(credentials=credentials,
+                               credentials_type=type(credentials))
+  raise ValueError('Unknown format: {0}'.format(fmt))
 
-_FORMATS = set(('bare', 'header', 'json', 'json_compact', 'pretty'))
+_FORMATS = {'bare', 'header', 'json', 'json_compact', 'pretty'}
 
 
 def _GetTokenInfo(access_token):
-    """Return the list of valid scopes for the given token as a list."""
-    url = _OAUTH2_TOKENINFO_TEMPLATE.format(access_token=access_token)
-    h = httplib2.Http()
-    response, content = h.request(url)
-    if 'status' not in response:
-        raise ValueError('No status in HTTP response')
-    status_code = int(response['status'])
-    if status_code not in [http_client.OK, http_client.BAD_REQUEST]:
-        msg = (
-            'Error making HTTP request to <{}>: status <{}>, '
-            'content <{}>'.format(url, response['status'], content))
-        raise ValueError(msg)
-    if status_code == http_client.BAD_REQUEST:
-        return {}
-    return json.loads(_AsText(content))
+  """Return the list of valid scopes for the given token as a list."""
+  url = _OAUTH2_TOKENINFO_TEMPLATE.format(access_token=access_token)
+  h = httplib2.Http()
+  response, content = h.request(url)
+  if 'status' not in response:
+      raise ValueError('No status in HTTP response')
+  status_code = int(response['status'])
+  if status_code not in [http_client.OK, http_client.BAD_REQUEST]:
+    msg = f"Error making HTTP request to <{url}>: status <{response['status']}>, content <{content}>"
+    raise ValueError(msg)
+  if status_code == http_client.BAD_REQUEST:
+      return {}
+  return json.loads(_AsText(content))
 
 
 def _TestToken(access_token):
@@ -197,24 +196,24 @@ def _TestToken(access_token):
 
 
 def _ProcessJsonArg(args):
-    """Get client_info and service_account_json_keyfile from args.
+  """Get client_info and service_account_json_keyfile from args.
 
     This just reads args.json, and decides (based on contents) whether
     it's a client_secrets or a service_account key, and returns as
     appropriate.
     """
-    filename = os.path.expanduser(args.json)
-    if not filename:
-        return '', ''
-    with open(filename, 'rU') as f:
-        try:
-            contents = json.load(f)
-        except ValueError:
-            raise ValueError('Invalid JSON file: {}'.format(args.json))
-    if contents.get('type', '') == 'service_account':
-        return '', filename
-    else:
-        return filename, ''
+  filename = os.path.expanduser(args.json)
+  if not filename:
+      return '', ''
+  with open(filename, 'rU') as f:
+    try:
+      contents = json.load(f)
+    except ValueError:
+      raise ValueError(f'Invalid JSON file: {args.json}')
+  if contents.get('type', '') == 'service_account':
+      return '', filename
+  else:
+      return filename, ''
 
 
 def _GetApplicationDefaultCredentials(scopes):
@@ -241,41 +240,39 @@ def _GetCredentialsFilename(credentials_filename):
 
 
 def _GetCredentialStore(credentials_filename, key_id, scopes):
-    credentials_filename = _GetCredentialsFilename(credentials_filename)
-    storage_key = '{}#{}'.format(key_id, scopes)
-    return multiprocess_file_storage.MultiprocessFileStorage(
-        credentials_filename, storage_key)
+  credentials_filename = _GetCredentialsFilename(credentials_filename)
+  storage_key = f'{key_id}#{scopes}'
+  return multiprocess_file_storage.MultiprocessFileStorage(
+      credentials_filename, storage_key)
 
 
 def _GetCredentialsVia3LO(client_info, credentials_filename=None):
-    credential_store = _GetCredentialStore(credentials_filename,
-                                           client_info['client_id'],
-                                           client_info['scope'])
-    credentials = credential_store.get()
-    if credentials is None or credentials.invalid:
-        for _ in range(10):
+  credential_store = _GetCredentialStore(credentials_filename,
+                                         client_info['client_id'],
+                                         client_info['scope'])
+  credentials = credential_store.get()
+  if credentials is None or credentials.invalid:
+    for _ in range(10):
             # If authorization fails, we want to retry, rather
             # than let this cascade up and get caught elsewhere.
             # If users want out of the retry loop, they can ^C.
-            try:
-                flow = client.OAuth2WebServerFlow(**client_info)
-                flags, _ = tools.argparser.parse_known_args(
-                    ['--noauth_local_webserver'])
-                credentials = tools.run_flow(
-                    flow, credential_store, flags)
-                break
-            except (SystemExit, client.FlowExchangeError) as e:
-                # Here SystemExit is "no credential at all", and the
-                # FlowExchangeError is "invalid" -- usually because
-                # you reused a token.
-                pass
-            except httplib2.HttpLib2Error as e:
-                raise ValueError(
-                    'Communication error creating credentials:'
-                    '{}'.format(e))
-        else:
-            credentials = None
-    return credentials
+      try:
+        flow = client.OAuth2WebServerFlow(**client_info)
+        flags, _ = tools.argparser.parse_known_args(
+            ['--noauth_local_webserver'])
+        credentials = tools.run_flow(
+            flow, credential_store, flags)
+        break
+      except (SystemExit, client.FlowExchangeError) as e:
+          # Here SystemExit is "no credential at all", and the
+          # FlowExchangeError is "invalid" -- usually because
+          # you reused a token.
+          pass
+      except httplib2.HttpLib2Error as e:
+        raise ValueError(f'Communication error creating credentials:{e}')
+    else:
+      credentials = None
+  return credentials
 
 
 def _GetCredentialForServiceAccount(json_keyfile, scopes,
@@ -295,36 +292,36 @@ def _GetCredentialForServiceAccount(json_keyfile, scopes,
     return credentials
 
 def _ConstructJwtCredential(json_keyfile, audience):
-    with open(json_keyfile, 'r') as json_keyfile_obj:
-        client_credentials = json.load(json_keyfile_obj)
+  with open(json_keyfile, 'r') as json_keyfile_obj:
+      client_credentials = json.load(json_keyfile_obj)
 
-    pkey = crypto.load_privatekey(crypto.FILETYPE_PEM, client_credentials['private_key'])
+  pkey = crypto.load_privatekey(crypto.FILETYPE_PEM, client_credentials['private_key'])
 
-    jwt_header = {
-        "alg": "RS256",
-        "typ": "JWT",
-        "kid": client_credentials['private_key_id']
-    }
+  jwt_header = {
+      "alg": "RS256",
+      "typ": "JWT",
+      "kid": client_credentials['private_key_id']
+  }
 
-    # Use time 1 minute before now to avoid clock skew with Google servers
-    current_time = int(time.time()) - 60
-    jwt_payload = {
-        "iss": client_credentials['client_email'],
-        "sub": client_credentials['client_email'],
-        "aud": audience,
-        "iat": current_time,
-        "exp": current_time + 3600
-    }
+  # Use time 1 minute before now to avoid clock skew with Google servers
+  current_time = int(time.time()) - 60
+  jwt_payload = {
+      "iss": client_credentials['client_email'],
+      "sub": client_credentials['client_email'],
+      "aud": audience,
+      "iat": current_time,
+      "exp": current_time + 3600
+  }
 
-    jwt_header_base64 = base64.urlsafe_b64encode(json.dumps(jwt_header, separators=(',', ':')).encode('utf-8')).decode().strip('=')
-    jwt_payload_base64 = base64.urlsafe_b64encode(json.dumps(jwt_payload, separators=(',', ':')).encode('utf-8')).decode().strip('=')
-    jwt_base_string = jwt_header_base64 + '.' + jwt_payload_base64
+  jwt_header_base64 = base64.urlsafe_b64encode(json.dumps(jwt_header, separators=(',', ':')).encode('utf-8')).decode().strip('=')
+  jwt_payload_base64 = base64.urlsafe_b64encode(json.dumps(jwt_payload, separators=(',', ':')).encode('utf-8')).decode().strip('=')
+  jwt_base_string = f'{jwt_header_base64}.{jwt_payload_base64}'
 
-    jwt_signature = base64.urlsafe_b64encode(crypto.sign(pkey, jwt_base_string, "sha256")).decode().strip('=')
+  jwt_signature = base64.urlsafe_b64encode(crypto.sign(pkey, jwt_base_string, "sha256")).decode().strip('=')
 
-    jwt = jwt_base_string + '.' + jwt_signature
+  jwt = f'{jwt_base_string}.{jwt_signature}'
 
-    return client.AccessTokenCredentials(jwt, _DEFAULT_USER_AGENT)
+  return client.AccessTokenCredentials(jwt, _DEFAULT_USER_AGENT)
 
 def _FetchCredentialWithSso(sso_cli, sso_email, scopes):
     """Fetch a credential with access_token fetched from the sso CLI."""
@@ -343,46 +340,45 @@ def _FetchCredentialWithSso(sso_cli, sso_email, scopes):
 
 
 def _FetchCredentials(args, client_info=None, credentials_filename=None):
-    """Fetch a credential for the given sso/client_info and scopes."""
-    scopes = _ExpandScopes(args.scope)
-    if args.sso:
-        return _FetchCredentialWithSso(
-            args.sso_cli if args.sso_cli else _SSO_CLI, args.sso, scopes)
+  """Fetch a credential for the given sso/client_info and scopes."""
+  scopes = _ExpandScopes(args.scope)
+  if args.sso:
+    return _FetchCredentialWithSso(args.sso_cli or _SSO_CLI, args.sso, scopes)
 
-    client_secrets, service_account_json_keyfile = _ProcessJsonArg(args)
+  client_secrets, service_account_json_keyfile = _ProcessJsonArg(args)
 
-    if service_account_json_keyfile and args.jwt:
-        if not scopes:
-            raise ValueError('No audience provided')
-        if len(scopes) > 1:
-            raise ValueError('More than one audience provided')
-        return _ConstructJwtCredential(service_account_json_keyfile, args.scope[0])
+  if service_account_json_keyfile and args.jwt:
+      if not scopes:
+          raise ValueError('No audience provided')
+      if len(scopes) > 1:
+          raise ValueError('More than one audience provided')
+      return _ConstructJwtCredential(service_account_json_keyfile, args.scope[0])
 
-    if not scopes:
-        raise ValueError('No scopes provided')
-    credentials = None
-    # If a service account or client secret file was provided, that
-    # takes precedence.
-    if service_account_json_keyfile:
-        credentials = _GetCredentialForServiceAccount(
-            service_account_json_keyfile, scopes,
-            credentials_filename or args.credentials_filename)
-    elif client_secrets:
-        client_info = GetClientInfoFromFile(client_secrets)
-        client_info['scope'] = ' '.join(sorted(scopes))
-        client_info['user_agent'] = _DEFAULT_USER_AGENT
-        credentials = _GetCredentialsVia3LO(
-            client_info, credentials_filename or args.credentials_filename)
-    else:
-        # Try ADC
-        credentials = _GetApplicationDefaultCredentials(scopes)
+  if not scopes:
+      raise ValueError('No scopes provided')
+  credentials = None
+  # If a service account or client secret file was provided, that
+  # takes precedence.
+  if service_account_json_keyfile:
+      credentials = _GetCredentialForServiceAccount(
+          service_account_json_keyfile, scopes,
+          credentials_filename or args.credentials_filename)
+  elif client_secrets:
+      client_info = GetClientInfoFromFile(client_secrets)
+      client_info['scope'] = ' '.join(sorted(scopes))
+      client_info['user_agent'] = _DEFAULT_USER_AGENT
+      credentials = _GetCredentialsVia3LO(
+          client_info, credentials_filename or args.credentials_filename)
+  else:
+      # Try ADC
+      credentials = _GetApplicationDefaultCredentials(scopes)
 
-    if credentials is None:
-        raise ValueError('Failed to fetch credentials')
-    credentials.user_agent = _DEFAULT_USER_AGENT
-    if credentials.access_token_expired or credentials.access_token is None:
-        credentials.refresh(httplib2.Http())
-    return credentials
+  if credentials is None:
+      raise ValueError('Failed to fetch credentials')
+  credentials.user_agent = _DEFAULT_USER_AGENT
+  if credentials.access_token_expired or credentials.access_token is None:
+      credentials.refresh(httplib2.Http())
+  return credentials
 
 
 def _Fetch(args):
